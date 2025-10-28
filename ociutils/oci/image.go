@@ -320,7 +320,12 @@ func (c *LocalCache) Start(ctx context.Context) error {
 	return nil
 }
 
-func NewLocalCache(log logr.Logger, registry *remote.Registry, store *store.Store, required sets.Set[Layer]) (*LocalCache, error) {
+func NewLocalCache(
+	log logr.Logger,
+	registry *remote.Registry,
+	store *store.Store,
+	required sets.Set[Layer],
+) (*LocalCache, error) {
 	if required == nil || len(required) == 0 {
 		log.V(0).Info("No layers required, set rootfs as default")
 		required = sets.Set[Layer]{}
