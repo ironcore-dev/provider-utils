@@ -1,0 +1,22 @@
+package gpu_test
+
+import (
+	"testing"
+
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+func TestGPUClaiming(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "GPU Claiming Suite")
+}
+
+var _ = BeforeSuite(func() {
+	//TODO set lower log level
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+})
