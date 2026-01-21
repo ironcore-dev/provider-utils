@@ -2,6 +2,7 @@ package gpu
 
 import (
 	"github.com/ironcore-dev/provider-utils/claimutils/claim"
+	"github.com/ironcore-dev/provider-utils/claimutils/pci"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -24,8 +25,8 @@ var _ = Describe("GPU Claimer", func() {
 		By("init plugin")
 		plugin := &gpuClaimPlugin{
 			log: log.FromContext(ctx),
-			devices: map[PCIAddress]ClaimStatus{
-				PCIAddress{}: ClaimStatusClaimed,
+			devices: map[pci.Address]ClaimStatus{
+				pci.Address{}: ClaimStatusClaimed,
 			},
 		}
 
@@ -38,8 +39,8 @@ var _ = Describe("GPU Claimer", func() {
 		By("init plugin")
 		plugin := &gpuClaimPlugin{
 			log: log.FromContext(ctx),
-			devices: map[PCIAddress]ClaimStatus{
-				PCIAddress{}: ClaimStatusFree,
+			devices: map[pci.Address]ClaimStatus{
+				pci.Address{}: ClaimStatusFree,
 			},
 		}
 
@@ -58,9 +59,9 @@ var _ = Describe("GPU Claimer", func() {
 		By("init plugin")
 		plugin := &gpuClaimPlugin{
 			log: log.FromContext(ctx),
-			devices: map[PCIAddress]ClaimStatus{
-				PCIAddress{}: ClaimStatusFree,
-				PCIAddress{
+			devices: map[pci.Address]ClaimStatus{
+				pci.Address{}: ClaimStatusFree,
+				pci.Address{
 					Function: 1,
 				}: ClaimStatusFree,
 			},
@@ -84,9 +85,9 @@ var _ = Describe("GPU Claimer", func() {
 		By("init plugin")
 		plugin := &gpuClaimPlugin{
 			log: log.FromContext(ctx),
-			devices: map[PCIAddress]ClaimStatus{
-				PCIAddress{}: ClaimStatusFree,
-				PCIAddress{
+			devices: map[pci.Address]ClaimStatus{
+				pci.Address{}: ClaimStatusFree,
+				pci.Address{
 					Function: 1,
 				}: ClaimStatusFree,
 			},
@@ -116,9 +117,9 @@ var _ = Describe("GPU Claimer", func() {
 		By("init plugin")
 		plugin := &gpuClaimPlugin{
 			log: log.FromContext(ctx),
-			devices: map[PCIAddress]ClaimStatus{
-				PCIAddress{}: ClaimStatusFree,
-				PCIAddress{
+			devices: map[pci.Address]ClaimStatus{
+				pci.Address{}: ClaimStatusFree,
+				pci.Address{
 					Function: 1,
 				}: ClaimStatusFree,
 			},
@@ -138,15 +139,15 @@ var _ = Describe("GPU Claimer", func() {
 		By("init plugin")
 		plugin := &gpuClaimPlugin{
 			log: log.FromContext(ctx),
-			devices: map[PCIAddress]ClaimStatus{
-				PCIAddress{}: ClaimStatusClaimed,
-				PCIAddress{
+			devices: map[pci.Address]ClaimStatus{
+				pci.Address{}: ClaimStatusClaimed,
+				pci.Address{
 					Function: 1,
 				}: ClaimStatusClaimed,
 			},
 		}
 
-		gpuClaim := NewGPUClaim([]PCIAddress{
+		gpuClaim := NewGPUClaim([]pci.Address{
 			{},
 			{
 				Function: 1,
@@ -167,9 +168,9 @@ var _ = Describe("GPU Claimer", func() {
 		By("init plugin")
 		plugin := &gpuClaimPlugin{
 			log: log.FromContext(ctx),
-			devices: map[PCIAddress]ClaimStatus{
-				PCIAddress{}: ClaimStatusClaimed,
-				PCIAddress{
+			devices: map[pci.Address]ClaimStatus{
+				pci.Address{}: ClaimStatusClaimed,
+				pci.Address{
 					Function: 1,
 				}: ClaimStatusClaimed,
 			},

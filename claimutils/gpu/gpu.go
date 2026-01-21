@@ -1,7 +1,7 @@
 package gpu
 
 import (
-	"fmt"
+	"github.com/ironcore-dev/provider-utils/claimutils/pci"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/provider-utils/claimutils/claim"
@@ -10,32 +10,21 @@ import (
 
 type Claim interface {
 	claim.ResourceClaim
-	PCIAddresses() []PCIAddress
+	PCIAddresses() []pci.Address
 }
 
-func NewGPUClaim(addresses []PCIAddress) Claim {
+func NewGPUClaim(addresses []pci.Address) Claim {
 	return &gpuClaim{
 		devices: addresses,
 	}
 }
 
 type gpuClaim struct {
-	devices []PCIAddress
+	devices []pci.Address
 }
 
-func (c gpuClaim) PCIAddresses() []PCIAddress {
+func (c gpuClaim) PCIAddresses() []pci.Address {
 	return c.devices
-}
-
-type PCIAddress struct {
-	Domain   uint
-	Bus      uint
-	Slot     uint
-	Function uint
-}
-
-func (p PCIAddress) String() string {
-	return fmt.Sprintf("%04x:%02x:%02x.%1x", p.Domain, p.Bus, p.Slot, p.Function)
 }
 
 type ClaimStatus bool
@@ -45,20 +34,24 @@ const (
 	ClaimStatusClaimed ClaimStatus = false
 )
 
-func NewGPUClaimPlugin(log logr.Logger, name string) claim.Plugin {
+func NewGPUClaimPlugin(log logr.Logger, name string, funcs ...InitFunc) claim.Plugin {
 	return &gpuClaimPlugin{
-		name: name,
-		log:  log,
+		name:      name,
+		log:       log,
+		initFuncs: funcs,
 	}
 }
 
+type InitFunc func(map[pci.Address]ClaimStatus) error
+
 type gpuClaimPlugin struct {
-	name    string
-	log     logr.Logger
-	devices map[PCIAddress]ClaimStatus
+	name      string
+	log       logr.Logger
+	devices   map[pci.Address]ClaimStatus
+	initFuncs []InitFunc
 }
 
-func (g gpuClaimPlugin) canClaim(quantity resource.Quantity) bool {
+func (g *gpuClaimPlugin) canClaim(quantity resource.Quantity) bool {
 	requested := quantity.Value()
 
 	var free int64
@@ -72,11 +65,11 @@ func (g gpuClaimPlugin) canClaim(quantity resource.Quantity) bool {
 	return free >= requested
 }
 
-func (g gpuClaimPlugin) CanClaim(quantity resource.Quantity) bool {
+func (g *gpuClaimPlugin) CanClaim(quantity resource.Quantity) bool {
 	return g.canClaim(quantity)
 }
 
-func (g gpuClaimPlugin) Claim(quantity resource.Quantity) (claim.ResourceClaim, error) {
+func (g *gpuClaimPlugin) Claim(quantity resource.Quantity) (claim.ResourceClaim, error) {
 	if !g.canClaim(quantity) {
 		return nil, claim.ErrInsufficientResources
 	}
@@ -100,7 +93,7 @@ func (g gpuClaimPlugin) Claim(quantity resource.Quantity) (claim.ResourceClaim, 
 	return gClaim, nil
 }
 
-func (g gpuClaimPlugin) Release(resourceClaim claim.ResourceClaim) error {
+func (g *gpuClaimPlugin) Release(resourceClaim claim.ResourceClaim) error {
 	gpu, ok := resourceClaim.(Claim)
 	if !ok {
 		return claim.ErrInvalidResourceClaim
@@ -120,6 +113,6 @@ func (g gpuClaimPlugin) Release(resourceClaim claim.ResourceClaim) error {
 	return nil
 }
 
-func (g gpuClaimPlugin) Name() string {
+func (g *gpuClaimPlugin) Name() string {
 	return g.name
 }

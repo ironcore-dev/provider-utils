@@ -24,6 +24,7 @@ func NewResourceClaimer(plugins ...Plugin) (*claimer, error) {
 		plugins: map[string]Plugin{},
 	}
 
+	//todo error if duplicate
 	for _, plugin := range plugins {
 		if err := plugin.Init(); err != nil {
 			return nil, err
@@ -89,7 +90,7 @@ func (c *claimer) Claim(resources v1alpha1.ResourceList) (Claims, error) {
 		claim, claimErr := plugin.Claim(resources[resourceName])
 		if claimErr != nil {
 			if err := c.release(claims); err != nil {
-				c.log.Error(errors.Join(ErrReleaseClaim, err), fmt.Sprintf("failed to release claim "))
+				c.log.Error(errors.Join(ErrReleaseClaim, err), "failed to release claim ")
 			}
 			return nil, claimErr
 		}
