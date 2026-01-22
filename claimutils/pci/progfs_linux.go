@@ -56,7 +56,7 @@ func (r *reader) Read() ([]Address, error) {
 		default:
 		}
 
-		r.log.V(1).Info("Found matching pci device", device.Name())
+		r.log.V(1).Info("Found matching pci device", "device", device.Name())
 		pciDevices = append(pciDevices, Address{
 			Domain:   uint(device.Location.Segment),
 			Bus:      uint(device.Location.Bus),
