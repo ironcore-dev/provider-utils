@@ -42,10 +42,9 @@ func NewGPUClaimPlugin(log logr.Logger, name string, reader pci.Reader, preClaim
 		name:      name,
 		log:       log,
 		pciReader: reader,
+		devices:   map[pci.Address]ClaimStatus{},
 	}
 }
-
-type InitFunc func(map[pci.Address]ClaimStatus) error
 
 type gpuClaimPlugin struct {
 	name       string
