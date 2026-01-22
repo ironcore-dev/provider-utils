@@ -3,6 +3,7 @@ package claim
 import (
 	"errors"
 	"fmt"
+
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/ironcore/api/core/v1alpha1"
 )
@@ -98,7 +99,7 @@ func (c *claimer) Claim(resources v1alpha1.ResourceList) (Claims, error) {
 		claims[resourceName] = claim
 	}
 
-	return nil, nil
+	return claims, nil
 }
 
 func (c *claimer) release(claims Claims) error {
