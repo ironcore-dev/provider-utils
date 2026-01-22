@@ -23,6 +23,6 @@ func main() {
 	}
 
 	for _, address := range addresses {
-		log.Info(fmt.Sprintf("PCI device: %v", address.String()))
+		log.Info(fmt.Sprintf("PCI device", "device", address.String()))
 	}
 }
