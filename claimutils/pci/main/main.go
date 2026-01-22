@@ -1,7 +1,9 @@
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 import (
-	"fmt"
 	"github.com/ironcore-dev/provider-utils/claimutils/pci"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -23,6 +25,6 @@ func main() {
 	}
 
 	for _, address := range addresses {
-		log.Info(fmt.Sprintf("PCI device", "device", address.String()))
+		log.Info("PCI device", "device", address.String())
 	}
 }

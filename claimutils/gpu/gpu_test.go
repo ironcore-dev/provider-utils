@@ -1,7 +1,11 @@
-package gpu
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
+package gpu_test
 
 import (
 	"github.com/ironcore-dev/provider-utils/claimutils/claim"
+	"github.com/ironcore-dev/provider-utils/claimutils/gpu"
 	"github.com/ironcore-dev/provider-utils/claimutils/pci"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -9,26 +13,51 @@ import (
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type MockReader struct {
+	devices []pci.Address
+	err     error
+}
+
+func (m *MockReader) Read() ([]pci.Address, error) {
+	return m.devices, m.err
+}
+
 var _ = Describe("GPU Claimer", func() {
+
+	It("should init correct", func(ctx SpecContext) {
+
+		By("init plugin without reader")
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", nil, nil)
+		Expect(plugin.Init()).Should(HaveOccurred())
+
+		By("init plugin without reader")
+		plugin = gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{}, nil)
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
+
+		By("check name")
+		Expect(plugin.Name()).Should(Equal("test-plugin"))
+
+	})
+
 	It("should error if no resource left (not init)", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-		}
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{}, nil)
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
 		By("claim resources")
 		_, err := plugin.Claim(resource.MustParse("1"))
 		Expect(err).To(MatchError(claim.ErrInsufficientResources))
+
 	})
 
 	It("should error if no resource left", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-			devices: map[pci.Address]ClaimStatus{
-				pci.Address{}: ClaimStatusClaimed,
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			devices: []pci.Address{
+				{},
 			},
-		}
+		}, []pci.Address{{}})
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
 		By("claim resources")
 		_, err := plugin.Claim(resource.MustParse("1"))
@@ -37,12 +66,12 @@ var _ = Describe("GPU Claimer", func() {
 
 	It("should claim device if enough are present", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-			devices: map[pci.Address]ClaimStatus{
-				pci.Address{}: ClaimStatusFree,
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			devices: []pci.Address{
+				{},
 			},
-		}
+		}, nil)
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
 		By("claim resources")
 		gpuClaim, err := plugin.Claim(resource.MustParse("1"))
@@ -57,15 +86,13 @@ var _ = Describe("GPU Claimer", func() {
 
 	It("should claim multiple devices", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-			devices: map[pci.Address]ClaimStatus{
-				pci.Address{}: ClaimStatusFree,
-				pci.Address{
-					Function: 1,
-				}: ClaimStatusFree,
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			devices: []pci.Address{
+				{},
+				{Function: 1},
 			},
-		}
+		}, nil)
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
 		By("claim resources to much resources")
 		gpuClaim, err := plugin.Claim(resource.MustParse("10"))
@@ -83,21 +110,19 @@ var _ = Describe("GPU Claimer", func() {
 
 	It("should claim different devices", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-			devices: map[pci.Address]ClaimStatus{
-				pci.Address{}: ClaimStatusFree,
-				pci.Address{
-					Function: 1,
-				}: ClaimStatusFree,
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			devices: []pci.Address{
+				{},
+				{Function: 1},
 			},
-		}
+		}, nil)
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
 		By("claim resources")
 		gpuClaim1, err := plugin.Claim(resource.MustParse("1"))
 		Expect(err).To(BeNil())
 
-		ociAddress1, ok := gpuClaim1.(Claim)
+		ociAddress1, ok := gpuClaim1.(gpu.Claim)
 		Expect(ok).To(BeTrue())
 		Expect(ociAddress1.PCIAddresses()).To(HaveLen(1))
 
@@ -105,7 +130,7 @@ var _ = Describe("GPU Claimer", func() {
 		gpuClaim2, err := plugin.Claim(resource.MustParse("1"))
 		Expect(err).To(BeNil())
 
-		ociAddress2, ok := gpuClaim2.(Claim)
+		ociAddress2, ok := gpuClaim2.(gpu.Claim)
 		Expect(ok).To(BeTrue())
 		Expect(ociAddress2.PCIAddresses()).To(HaveLen(1))
 
@@ -115,21 +140,19 @@ var _ = Describe("GPU Claimer", func() {
 
 	It("should claim different devices", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-			devices: map[pci.Address]ClaimStatus{
-				pci.Address{}: ClaimStatusFree,
-				pci.Address{
-					Function: 1,
-				}: ClaimStatusFree,
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			devices: []pci.Address{
+				{},
+				{Function: 1},
 			},
-		}
+		}, nil)
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
 		By("claim resources")
 		claim, err := plugin.Claim(resource.MustParse("0"))
 		Expect(err).To(BeNil())
 
-		gpuClaim, ok := claim.(Claim)
+		gpuClaim, ok := claim.(gpu.Claim)
 		Expect(ok).To(BeTrue())
 		Expect(gpuClaim.PCIAddresses()).To(BeEmpty())
 
@@ -137,17 +160,18 @@ var _ = Describe("GPU Claimer", func() {
 
 	It("should release devices", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-			devices: map[pci.Address]ClaimStatus{
-				pci.Address{}: ClaimStatusClaimed,
-				pci.Address{
-					Function: 1,
-				}: ClaimStatusClaimed,
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			devices: []pci.Address{
+				{},
+				{Function: 1},
 			},
-		}
+		}, []pci.Address{
+			{},
+			{Function: 1},
+		})
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
-		gpuClaim := NewGPUClaim([]pci.Address{
+		gpuClaim := gpu.NewGPUClaim([]pci.Address{
 			{},
 			{
 				Function: 1,
@@ -166,16 +190,18 @@ var _ = Describe("GPU Claimer", func() {
 
 	It("should fail on generic claim", func(ctx SpecContext) {
 		By("init plugin")
-		plugin := &gpuClaimPlugin{
-			log: log.FromContext(ctx),
-			devices: map[pci.Address]ClaimStatus{
-				pci.Address{}: ClaimStatusClaimed,
-				pci.Address{
-					Function: 1,
-				}: ClaimStatusClaimed,
+		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			devices: []pci.Address{
+				{},
+				{Function: 1},
 			},
-		}
+		}, []pci.Address{
+			{},
+			{Function: 1},
+		})
+		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
+		By("passing nil claim")
 		Expect(plugin.Release(nil)).To(MatchError(claim.ErrInvalidResourceClaim))
 	})
 

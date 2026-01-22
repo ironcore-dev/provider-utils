@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package pci
 
 import (
@@ -46,14 +49,13 @@ func (r *reader) Read() ([]Address, error) {
 
 	var pciDevices []Address
 	for _, device := range devices {
-		r.log.V(3).Info("Found pci device", "device", device.Name())
-
 		switch {
 		case device.Class != uint32(r.classFilter):
+			r.log.V(3).Info("Skipping device, class not matching", "device", device.Name(), "expected class", r.classFilter, "found class", device.Class)
 			continue
 		case device.Vendor != uint32(r.vendorFilter):
+			r.log.V(3).Info("Skipping device, vendor not matching", "device", device.Name(), "expected vendor", r.vendorFilter, "found vendor", device.Vendor)
 			continue
-		default:
 		}
 
 		r.log.V(1).Info("Found matching pci device", "device", device.Name())
@@ -66,5 +68,5 @@ func (r *reader) Read() ([]Address, error) {
 
 	}
 
-	return nil, nil
+	return pciDevices, nil
 }

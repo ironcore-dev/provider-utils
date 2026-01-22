@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package gpu
 
 import (
@@ -39,10 +42,11 @@ const (
 func NewGPUClaimPlugin(log logr.Logger, name string, reader pci.Reader, preClaimed []pci.Address) claim.Plugin {
 
 	return &gpuClaimPlugin{
-		name:      name,
-		log:       log,
-		pciReader: reader,
-		devices:   map[pci.Address]ClaimStatus{},
+		name:       name,
+		log:        log,
+		pciReader:  reader,
+		devices:    map[pci.Address]ClaimStatus{},
+		preClaimed: preClaimed,
 	}
 }
 
