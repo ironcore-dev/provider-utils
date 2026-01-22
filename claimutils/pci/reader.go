@@ -16,5 +16,5 @@ func (p Address) String() string {
 }
 
 type Reader interface {
-	Read() []Address
+	Read() ([]Address, error)
 }

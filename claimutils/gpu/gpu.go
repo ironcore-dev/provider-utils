@@ -1,6 +1,8 @@
 package gpu
 
 import (
+	"errors"
+	"fmt"
 	"github.com/ironcore-dev/provider-utils/claimutils/pci"
 
 	"github.com/go-logr/logr"
@@ -34,21 +36,23 @@ const (
 	ClaimStatusClaimed ClaimStatus = false
 )
 
-func NewGPUClaimPlugin(log logr.Logger, name string, funcs ...InitFunc) claim.Plugin {
+func NewGPUClaimPlugin(log logr.Logger, name string, reader pci.Reader, preClaimed []pci.Address) claim.Plugin {
+
 	return &gpuClaimPlugin{
 		name:      name,
 		log:       log,
-		initFuncs: funcs,
+		pciReader: reader,
 	}
 }
 
 type InitFunc func(map[pci.Address]ClaimStatus) error
 
 type gpuClaimPlugin struct {
-	name      string
-	log       logr.Logger
-	devices   map[pci.Address]ClaimStatus
-	initFuncs []InitFunc
+	name       string
+	log        logr.Logger
+	devices    map[pci.Address]ClaimStatus
+	pciReader  pci.Reader
+	preClaimed []pci.Address
 }
 
 func (g *gpuClaimPlugin) canClaim(quantity resource.Quantity) bool {
@@ -108,6 +112,35 @@ func (g *gpuClaimPlugin) Release(resourceClaim claim.ResourceClaim) error {
 
 		g.log.V(3).Info("Unclaimed device", "pciAddress", pciAddress)
 		g.devices[pciAddress] = ClaimStatusFree
+	}
+
+	return nil
+}
+
+func (g *gpuClaimPlugin) Init() error {
+	if g.pciReader == nil {
+		return errors.New("no reader provided")
+	}
+
+	pciDevices, err := g.pciReader.Read()
+	if err != nil {
+		return fmt.Errorf("failed to read pci devices: %w", err)
+	}
+
+	for _, pciDevice := range pciDevices {
+		g.log.V(2).Info("Found device", "pciAddress", pciDevice)
+		g.devices[pciDevice] = ClaimStatusFree
+	}
+
+	for _, pciDevice := range g.preClaimed {
+		if _, ok := g.devices[pciDevice]; !ok {
+			g.log.V(2).Info("Not discovered pre-claimed pci address", "pciAddress", pciDevice)
+
+		}
+
+		g.log.V(2).Info("Set device to claimed", "pciAddress", pciDevice)
+		g.devices[pciDevice] = ClaimStatusClaimed
+		continue
 	}
 
 	return nil
