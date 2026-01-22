@@ -9,15 +9,6 @@ import (
 	"github.com/prometheus/procfs/sysfs"
 )
 
-type Class uint32
-type Vendor uint32
-
-var (
-	Class3DController Class = 0x030200
-
-	VendorNvidia Vendor = 0x10de
-)
-
 type reader struct {
 	log logr.Logger
 	fs  sysfs.FS
@@ -28,6 +19,21 @@ type reader struct {
 
 func NewReader(log logr.Logger, vendorFilter Vendor, classFilter Class) (*reader, error) {
 	fs, err := sysfs.NewDefaultFS()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open sysfs: %w", err)
+	}
+
+	return &reader{
+		log:          log,
+		fs:           fs,
+		vendorFilter: vendorFilter,
+		classFilter:  classFilter,
+	}, nil
+
+}
+
+func NewReaderWithMount(log logr.Logger, mountPoint string, vendorFilter Vendor, classFilter Class) (*reader, error) {
+	fs, err := sysfs.NewFS(mountPoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sysfs: %w", err)
 	}

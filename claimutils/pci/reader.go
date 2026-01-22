@@ -7,6 +7,15 @@ import (
 	"fmt"
 )
 
+type Class uint32
+type Vendor uint32
+
+var (
+	Class3DController Class = 0x030200
+
+	VendorNvidia Vendor = 0x10de
+)
+
 type Address struct {
 	Domain   uint
 	Bus      uint

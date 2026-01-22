@@ -2,3 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 package pci
+
+import (
+	"github.com/go-logr/logr"
+)
+
+type reader struct {
+	log logr.Logger
+}
+
+func NewReader(log logr.Logger, vendorFilter Vendor, classFilter Class) (*reader, error) {
+	log.V(1).Info("NOT SUPPORTED OS")
+
+	return &reader{
+		log: log,
+	}, nil
+
+}
+
+func (r *reader) Read() ([]Address, error) {
+	log.V(1).Info("NOT SUPPORTED OS")
+	return nil, nil
+}

@@ -13,9 +13,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestGPUClaiming(t *testing.T) {
+func TestClaimer(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "GPU Claiming Suite")
+	RunSpecs(t, "Claimer Suite")
 }
 
 var _ = BeforeSuite(func() {
