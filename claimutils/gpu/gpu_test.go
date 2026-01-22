@@ -4,6 +4,7 @@
 package gpu_test
 
 import (
+	"errors"
 	"github.com/ironcore-dev/provider-utils/claimutils/claim"
 	"github.com/ironcore-dev/provider-utils/claimutils/gpu"
 	"github.com/ironcore-dev/provider-utils/claimutils/pci"
@@ -37,6 +38,12 @@ var _ = Describe("GPU Claimer", func() {
 		By("check name")
 		Expect(plugin.Name()).Should(Equal("test-plugin"))
 
+		By("init plugin with failing reader")
+		testErr := errors.New("test error")
+		plugin = gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
+			err: testErr,
+		}, nil)
+		Expect(plugin.Init()).Should(MatchError(testErr))
 	})
 
 	It("should error if no resource left (not init)", func(ctx SpecContext) {

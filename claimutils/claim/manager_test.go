@@ -14,30 +14,62 @@ import (
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type mockReader struct{}
+type mockReader struct {
+	devices []pci.Address
+	err     error
+}
 
-func (*mockReader) Read() ([]pci.Address, error) {
-	return nil, nil
+func (m *mockReader) Read() ([]pci.Address, error) {
+	return m.devices, m.err
 }
 
 var _ = Describe("Resource Claimer", func() {
 	It("should claim composite resources", func(ctx SpecContext) {
 		By("init plugin")
-
-		resources, err := claim.NewResourceClaimer(
-			gpu.NewGPUClaimPlugin(log.FromContext(ctx), "nvidia.com/gpu", &mockReader{}, []pci.Address{}),
+		resourceClaimer, err := claim.NewResourceClaimer(
+			gpu.NewGPUClaimPlugin(log.FromContext(ctx), "nvidia.com/gpu", &mockReader{
+				devices: []pci.Address{
+					{},
+					{Function: 1},
+				},
+			}, nil),
 		)
 		Expect(err).NotTo(HaveOccurred())
 
-		resourceClaim, err := resources.Claim(v1alpha1.ResourceList{
+		By("failing if not not existing resource is claimed")
+		resourceClaim, err := resourceClaimer.Claim(v1alpha1.ResourceList{
 			"not_existing_plugin": resource.MustParse("1"),
 		})
 		Expect(err).To(MatchError(claim.ErrMissingPlugins))
 		Expect(resourceClaim).To(BeNil())
 
-		//resourceClaim, err := resources.Claim(v1alpha1.ResourceList{
-		//	"nvidia.com/gpu": resource.MustParse("1"),
-		//})
+		By("claiming correct resource")
+		resourceClaim, err = resourceClaimer.Claim(v1alpha1.ResourceList{
+			"nvidia.com/gpu": resource.MustParse("1"),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resourceClaim).NotTo(BeNil())
+		Expect(resourceClaim).To(HaveKey(v1alpha1.ResourceName("nvidia.com/gpu")))
+
+		gpuClaim, ok := resourceClaim[v1alpha1.ResourceName("nvidia.com/gpu")].(gpu.Claim)
+		Expect(ok).To(BeTrue())
+		Expect(gpuClaim.PCIAddresses()).To(Not(BeNil()))
+
+		By("releasing resource")
+		Expect(resourceClaimer.Release(resourceClaim)).NotTo(HaveOccurred())
+
+		By("claiming correct resource")
+		resourceClaim, err = resourceClaimer.Claim(v1alpha1.ResourceList{
+			"nvidia.com/gpu": resource.MustParse("2"),
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("claiming again resource")
+		resourceClaim, err = resourceClaimer.Claim(v1alpha1.ResourceList{
+			"nvidia.com/gpu": resource.MustParse("2"),
+		})
+		Expect(err).Should(MatchError(claim.ErrInsufficientResources))
+
 	})
 
 })
