@@ -58,10 +58,18 @@ func (r *reader) Read() ([]Address, error) {
 	for _, device := range devices {
 		switch {
 		case device.Class != uint32(r.classFilter):
-			r.log.V(3).Info("Skipping device, class not matching", "device", device.Name(), "expected class", r.classFilter, "found class", device.Class)
+			r.log.V(3).Info(
+				"Skipping device, class not matching",
+				"device", device.Name(), "expected class",
+				r.classFilter, "found class", device.Class,
+			)
 			continue
 		case device.Vendor != uint32(r.vendorFilter):
-			r.log.V(3).Info("Skipping device, vendor not matching", "device", device.Name(), "expected vendor", r.vendorFilter, "found vendor", device.Vendor)
+			r.log.V(3).Info(
+				"Skipping device, vendor not matching",
+				"device", device.Name(), "expected vendor",
+				r.vendorFilter, "found vendor", device.Vendor,
+			)
 			continue
 		}
 
