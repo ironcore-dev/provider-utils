@@ -109,7 +109,7 @@ var _ = Describe("GPU Claimer", func() {
 
 		By("claim resources")
 		_, err = plugin.Claim(resource.MustParse("2"))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		By("claim resources when not sufficient")
 		_, err = plugin.Claim(resource.MustParse("1"))
@@ -128,7 +128,7 @@ var _ = Describe("GPU Claimer", func() {
 
 		By("claim resources")
 		gpuClaim1, err := plugin.Claim(resource.MustParse("1"))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		ociAddress1, ok := gpuClaim1.(gpu.Claim)
 		Expect(ok).To(BeTrue())
@@ -136,7 +136,7 @@ var _ = Describe("GPU Claimer", func() {
 
 		By("claim resources again")
 		gpuClaim2, err := plugin.Claim(resource.MustParse("1"))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		ociAddress2, ok := gpuClaim2.(gpu.Claim)
 		Expect(ok).To(BeTrue())
@@ -158,7 +158,7 @@ var _ = Describe("GPU Claimer", func() {
 
 		By("claim resources")
 		claim, err := plugin.Claim(resource.MustParse("0"))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		gpuClaim, ok := claim.(gpu.Claim)
 		Expect(ok).To(BeTrue())
@@ -193,7 +193,7 @@ var _ = Describe("GPU Claimer", func() {
 
 		By("claim resources")
 		_, err := plugin.Claim(resource.MustParse("2"))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should fail on generic claim", func(ctx SpecContext) {

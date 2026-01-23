@@ -71,13 +71,13 @@ var _ = Describe("Resource Claimer", func() {
 		Expect(resourceClaimer.Release(ctx, resourceClaim)).NotTo(HaveOccurred())
 
 		By("claiming correct resource")
-		resourceClaim, err = resourceClaimer.Claim(ctx, v1alpha1.ResourceList{
+		_, err = resourceClaimer.Claim(ctx, v1alpha1.ResourceList{
 			"nvidia.com/gpu": resource.MustParse("2"),
 		})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("claiming again resource")
-		resourceClaim, err = resourceClaimer.Claim(ctx, v1alpha1.ResourceList{
+		_, err = resourceClaimer.Claim(ctx, v1alpha1.ResourceList{
 			"nvidia.com/gpu": resource.MustParse("2"),
 		})
 		Expect(err).Should(MatchError(claim.ErrInsufficientResources))

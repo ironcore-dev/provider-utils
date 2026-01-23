@@ -11,7 +11,7 @@ type reader struct {
 	log logr.Logger
 }
 
-func NewReader(log logr.Logger, vendorFilter Vendor, classFilter Class) (*reader, error) {
+func NewReader(log logr.Logger, _ Vendor, _ Class) (*reader, error) {
 	log.V(1).Info("NOT SUPPORTED OS")
 
 	return &reader{

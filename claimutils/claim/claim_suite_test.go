@@ -6,6 +6,7 @@ package claim_test
 import (
 	"testing"
 
+	"go.uber.org/zap/zapcore"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -19,7 +20,5 @@ func TestClaimer(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	//TODO set lower log level
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), zap.Level(zapcore.Level(-3))))
 })

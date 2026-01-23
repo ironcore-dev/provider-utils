@@ -138,7 +138,10 @@ func (c *claimer) claim(resources v1alpha1.ResourceList) (Claims, error) {
 	for resourceName := range resources {
 		plugin := c.plugins[string(resourceName)]
 		if !plugin.CanClaim(resources[resourceName]) {
-			insufficientResourceErrors = append(insufficientResourceErrors, fmt.Errorf("insufficient resource for %s", resourceName))
+			insufficientResourceErrors = append(
+				insufficientResourceErrors,
+				fmt.Errorf("insufficient resource for %s", resourceName),
+			)
 		}
 	}
 	if len(insufficientResourceErrors) > 0 {
