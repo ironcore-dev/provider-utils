@@ -59,7 +59,7 @@ func writeFakePCIDevice(t *testing.T, sysRoot, id string, vals map[string]string
 	}
 }
 
-func TestGPUClaimer_InitCorrect(t *testing.T) {
+func TestPCIReader_ReadFilters(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// matching device 1

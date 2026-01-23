@@ -138,12 +138,12 @@ func (g *gpuClaimPlugin) Init() error {
 	for _, pciDevice := range g.preClaimed {
 		if _, ok := g.devices[pciDevice]; !ok {
 			g.log.V(2).Info("Not discovered pre-claimed pci address", "pciAddress", pciDevice)
-
+			continue
 		}
 
 		g.log.V(2).Info("Set device to claimed", "pciAddress", pciDevice)
 		g.devices[pciDevice] = ClaimStatusClaimed
-		continue
+
 	}
 
 	return nil

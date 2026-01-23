@@ -146,7 +146,7 @@ var _ = Describe("GPU Claimer", func() {
 		Expect(ociAddress1.PCIAddresses()[0]).NotTo(Equal(ociAddress2.PCIAddresses()[0]))
 	})
 
-	It("should claim different devices", func(ctx SpecContext) {
+	It("should handle zero-quantity claims", func(ctx SpecContext) {
 		By("init plugin")
 		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{
 			devices: []pci.Address{

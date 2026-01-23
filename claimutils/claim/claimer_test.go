@@ -29,6 +29,7 @@ var _ = Describe("Resource Claimer", func() {
 	It("should claim composite resources", func(ctx SpecContext) {
 		By("init plugin")
 		resourceClaimer, err := claim.NewResourceClaimer(
+			log.FromContext(ctx),
 			gpu.NewGPUClaimPlugin(log.FromContext(ctx), "nvidia.com/gpu", &mockReader{
 				devices: []pci.Address{
 					{},
@@ -39,14 +40,19 @@ var _ = Describe("Resource Claimer", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		innerCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		// start the Runnable in the background
 		errCh := make(chan error, 1)
+		defer cancel()
 		go func() {
 			defer GinkgoRecover()
 			errCh <- resourceClaimer.Start(innerCtx)
 		}()
+
+		DeferCleanup(func() {
+			cancel()
+			var startErr error
+			Eventually(errCh).Should(Receive(&startErr))
+			Expect(startErr).To(Succeed())
+		})
 
 		By("failing if not not existing resource is claimed")
 		var resourceClaim claim.Claims

@@ -28,8 +28,9 @@ type Claimer interface {
 	Start(ctx context.Context) error
 }
 
-func NewResourceClaimer(plugins ...Plugin) (*claimer, error) {
+func NewResourceClaimer(log logr.Logger, plugins ...Plugin) (*claimer, error) {
 	c := claimer{
+		log:       log,
 		plugins:   map[string]Plugin{},
 		toClaim:   make(chan claimReq, 1),
 		toRelease: make(chan releaseReq, 1),
