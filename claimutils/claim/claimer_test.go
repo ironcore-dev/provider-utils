@@ -49,10 +49,14 @@ var _ = Describe("Resource Claimer", func() {
 		}()
 
 		By("failing if not not existing resource is claimed")
-		resourceClaim, err := resourceClaimer.Claim(ctx, v1alpha1.ResourceList{
-			"not_existing_plugin": resource.MustParse("1"),
-		})
-		Expect(err).To(MatchError(claim.ErrMissingPlugins))
+		var resourceClaim claim.Claims
+		Eventually(func() error {
+			var err error
+			resourceClaim, err = resourceClaimer.Claim(ctx, v1alpha1.ResourceList{
+				"not_existing_plugin": resource.MustParse("1"),
+			})
+			return err
+		}).Should(MatchError(claim.ErrMissingPlugins))
 		Expect(resourceClaim).To(BeNil())
 
 		By("claiming correct resource")

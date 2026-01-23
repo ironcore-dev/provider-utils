@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
+	"sync/atomic"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/ironcore/api/core/v1alpha1"
@@ -16,6 +16,8 @@ import (
 var (
 	ErrMissingPlugins = errors.New("no plugin for resource")
 	ErrReleaseClaim   = errors.New("failed to release claim")
+	ErrAlreadyStarted = errors.New("claimer already started")
+	ErrNotStarted     = errors.New("claimer not running")
 )
 
 type Claims map[v1alpha1.ResourceName]ResourceClaim
@@ -69,6 +71,8 @@ type claimer struct {
 
 	toClaim   chan claimReq
 	toRelease chan releaseReq
+
+	running atomic.Bool
 }
 
 func (c *claimer) checkPluginsForResources(resources v1alpha1.ResourceList) error {
@@ -100,16 +104,14 @@ func (c *claimer) checkPluginsForClaims(claims Claims) error {
 }
 
 func (c *claimer) Start(ctx context.Context) error {
-	var wg sync.WaitGroup
+	if !c.running.CompareAndSwap(false, true) {
+		return ErrAlreadyStarted
+	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.run(ctx)
-	}()
+	go c.run(ctx)
 
-	wg.Wait()
-
+	<-ctx.Done()
+	c.running.Store(false)
 	return nil
 }
 
@@ -171,11 +173,19 @@ func (c *claimer) Claim(ctx context.Context, resources v1alpha1.ResourceList) (C
 		return nil, errors.Join(ErrMissingPlugins, err)
 	}
 
+	if !c.running.Load() {
+		return nil, ErrNotStarted
+	}
+
 	req := claimReq{
 		resources:  resources,
 		resultChan: make(chan claimRes, 1),
 	}
-	c.toClaim <- req
+	select {
+	case c.toClaim <- req:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 
 	select {
 	case <-ctx.Done():
@@ -206,11 +216,19 @@ func (c *claimer) Release(ctx context.Context, claims Claims) error {
 		return errors.Join(ErrMissingPlugins, err)
 	}
 
+	if !c.running.Load() {
+		return ErrNotStarted
+	}
+
 	req := releaseReq{
 		claims:     claims,
 		resultChan: make(chan error, 1),
 	}
-	c.toRelease <- req
+	select {
+	case c.toRelease <- req:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	select {
 	case <-ctx.Done():
