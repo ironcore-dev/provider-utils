@@ -4,8 +4,10 @@
 package claim
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/ironcore/api/core/v1alpha1"
@@ -21,26 +23,52 @@ type Claims map[v1alpha1.ResourceName]ResourceClaim
 type Claimer interface {
 	Claim(resources v1alpha1.ResourceList) (Claims, error)
 	Release(claims Claims) error
+	Start(ctx context.Context) error
 }
 
 func NewResourceClaimer(plugins ...Plugin) (*claimer, error) {
 	c := claimer{
-		plugins: map[string]Plugin{},
+		plugins:   map[string]Plugin{},
+		toClaim:   make(chan claimReq, 1),
+		toRelease: make(chan releaseReq, 1),
 	}
 
-	//todo error if duplicate
 	for _, plugin := range plugins {
-		if err := plugin.Init(); err != nil {
-			return nil, err
+		if _, existing := c.plugins[plugin.Name()]; existing {
+			return nil, fmt.Errorf("plugin %s already exists", plugin.Name())
 		}
 		c.plugins[plugin.Name()] = plugin
 	}
+
+	for _, plugin := range c.plugins {
+		if err := plugin.Init(); err != nil {
+			return nil, err
+		}
+	}
 	return &c, nil
+}
+
+type claimRes struct {
+	claims Claims
+	err    error
+}
+
+type claimReq struct {
+	resources  v1alpha1.ResourceList
+	resultChan chan claimRes
+}
+
+type releaseReq struct {
+	claims     Claims
+	resultChan chan error
 }
 
 type claimer struct {
 	log     logr.Logger
 	plugins map[string]Plugin
+
+	toClaim   chan claimReq
+	toRelease chan releaseReq
 }
 
 func (c *claimer) checkPluginsForResources(resources v1alpha1.ResourceList) error {
@@ -71,11 +99,41 @@ func (c *claimer) checkPluginsForClaims(claims Claims) error {
 	return nil
 }
 
-func (c *claimer) Claim(resources v1alpha1.ResourceList) (Claims, error) {
-	if err := c.checkPluginsForResources(resources); err != nil {
-		return nil, errors.Join(ErrMissingPlugins, err)
-	}
+func (c *claimer) Start(ctx context.Context) error {
+	var wg sync.WaitGroup
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.run(ctx)
+	}()
+
+	wg.Wait()
+
+	return nil
+}
+
+func (c *claimer) run(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case req := <-c.toClaim:
+			res := claimRes{}
+			res.claims, res.err = c.claim(req.resources)
+			req.resultChan <- res
+
+		case req := <-c.toRelease:
+			if err := c.release(req.claims); err != nil {
+				req.resultChan <- errors.Join(ErrReleaseClaim, err)
+			} else {
+				req.resultChan <- nil
+			}
+		}
+	}
+}
+
+func (c *claimer) claim(resources v1alpha1.ResourceList) (Claims, error) {
 	var insufficientResourceErrors []error
 	for resourceName := range resources {
 		plugin := c.plugins[string(resourceName)]
@@ -105,6 +163,25 @@ func (c *claimer) Claim(resources v1alpha1.ResourceList) (Claims, error) {
 	return claims, nil
 }
 
+func (c *claimer) Claim(ctx context.Context, resources v1alpha1.ResourceList) (Claims, error) {
+	if err := c.checkPluginsForResources(resources); err != nil {
+		return nil, errors.Join(ErrMissingPlugins, err)
+	}
+
+	req := claimReq{
+		resources:  resources,
+		resultChan: make(chan claimRes, 1),
+	}
+	c.toClaim <- req
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-req.resultChan:
+		return res.claims, res.err
+	}
+}
+
 func (c *claimer) release(claims Claims) error {
 	var releaseErrors []error
 	for resourceName := range claims {
@@ -121,14 +198,21 @@ func (c *claimer) release(claims Claims) error {
 	return nil
 }
 
-func (c *claimer) Release(claims Claims) error {
+func (c *claimer) Release(ctx context.Context, claims Claims) error {
 	if err := c.checkPluginsForClaims(claims); err != nil {
 		return errors.Join(ErrMissingPlugins, err)
 	}
 
-	if err := c.release(claims); err != nil {
-		return errors.Join(ErrReleaseClaim, err)
+	req := releaseReq{
+		claims:     claims,
+		resultChan: make(chan error, 1),
 	}
+	c.toRelease <- req
 
-	return nil
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case res := <-req.resultChan:
+		return res
+	}
 }

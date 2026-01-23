@@ -6,10 +6,10 @@ package gpu
 import (
 	"errors"
 	"fmt"
-	"github.com/ironcore-dev/provider-utils/claimutils/pci"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/provider-utils/claimutils/claim"
+	"github.com/ironcore-dev/provider-utils/claimutils/pci"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 

@@ -5,6 +5,7 @@ package gpu_test
 
 import (
 	"errors"
+
 	"github.com/ironcore-dev/provider-utils/claimutils/claim"
 	"github.com/ironcore-dev/provider-utils/claimutils/gpu"
 	"github.com/ironcore-dev/provider-utils/claimutils/pci"
