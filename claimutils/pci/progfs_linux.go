@@ -5,6 +5,7 @@ package pci
 
 import (
 	"fmt"
+
 	"github.com/go-logr/logr"
 	"github.com/prometheus/procfs/sysfs"
 )

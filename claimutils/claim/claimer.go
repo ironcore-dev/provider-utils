@@ -21,8 +21,8 @@ var (
 type Claims map[v1alpha1.ResourceName]ResourceClaim
 
 type Claimer interface {
-	Claim(resources v1alpha1.ResourceList) (Claims, error)
-	Release(claims Claims) error
+	Claim(ctx context.Context, resources v1alpha1.ResourceList) (Claims, error)
+	Release(ctx context.Context, claims Claims) error
 	Start(ctx context.Context) error
 }
 
