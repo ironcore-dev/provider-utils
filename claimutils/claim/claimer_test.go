@@ -27,13 +27,9 @@ func (m *mockReader) Read() ([]pci.Address, error) {
 
 var _ = Describe("Resource Claimer", func() {
 	It("should claim composite resources", func(ctx SpecContext) {
-
-		claimerStarted := make(chan struct{})
-
 		By("init plugin")
 		resourceClaimer, err := claim.NewResourceClaimer(
 			log.FromContext(ctx),
-			claimerStarted,
 			gpu.NewGPUClaimPlugin(log.FromContext(ctx), "nvidia.com/gpu", &mockReader{
 				devices: []pci.Address{
 					{},
@@ -59,9 +55,9 @@ var _ = Describe("Resource Claimer", func() {
 		})
 
 		By("waiting until claimer is started")
-		Eventually(claimerStarted).To(BeClosed())
+		Expect(resourceClaimer.WaitUntilStarted(ctx)).To(Succeed())
 
-		By("failing if not not existing resource is claimed")
+		By("failing if nonexistent resource is claimed")
 		resourceClaim, err := resourceClaimer.Claim(ctx, v1alpha1.ResourceList{
 			"not_existing_plugin": resource.MustParse("1"),
 		})

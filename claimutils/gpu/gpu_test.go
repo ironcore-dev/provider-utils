@@ -47,7 +47,7 @@ var _ = Describe("GPU Claimer", func() {
 		Expect(plugin.Init()).Should(MatchError(testErr))
 	})
 
-	It("should error if no resource left (not init)", func(ctx SpecContext) {
+	It("should error if no resource left after init", func(ctx SpecContext) {
 		By("init plugin")
 		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{}, nil)
 		Expect(plugin.Init()).ShouldNot(HaveOccurred())
@@ -130,20 +130,20 @@ var _ = Describe("GPU Claimer", func() {
 		gpuClaim1, err := plugin.Claim(resource.MustParse("1"))
 		Expect(err).ToNot(HaveOccurred())
 
-		ociAddress1, ok := gpuClaim1.(gpu.Claim)
+		pciAddress1, ok := gpuClaim1.(gpu.Claim)
 		Expect(ok).To(BeTrue())
-		Expect(ociAddress1.PCIAddresses()).To(HaveLen(1))
+		Expect(pciAddress1.PCIAddresses()).To(HaveLen(1))
 
 		By("claim resources again")
 		gpuClaim2, err := plugin.Claim(resource.MustParse("1"))
 		Expect(err).ToNot(HaveOccurred())
 
-		ociAddress2, ok := gpuClaim2.(gpu.Claim)
+		pciAddress2, ok := gpuClaim2.(gpu.Claim)
 		Expect(ok).To(BeTrue())
-		Expect(ociAddress2.PCIAddresses()).To(HaveLen(1))
+		Expect(pciAddress2.PCIAddresses()).To(HaveLen(1))
 
 		By("ensure claims are not equal")
-		Expect(ociAddress1.PCIAddresses()[0]).NotTo(Equal(ociAddress2.PCIAddresses()[0]))
+		Expect(pciAddress1.PCIAddresses()[0]).NotTo(Equal(pciAddress2.PCIAddresses()[0]))
 	})
 
 	It("should handle zero-quantity claims", func(ctx SpecContext) {

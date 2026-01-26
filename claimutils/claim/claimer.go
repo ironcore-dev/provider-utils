@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
+	"sync"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/ironcore/api/core/v1alpha1"
@@ -26,15 +26,19 @@ type Claimer interface {
 	Claim(ctx context.Context, resources v1alpha1.ResourceList) (Claims, error)
 	Release(ctx context.Context, claims Claims) error
 	Start(ctx context.Context) error
+	WaitUntilStarted(ctx context.Context) error
 }
 
-func NewResourceClaimer(log logr.Logger, started chan struct{}, plugins ...Plugin) (*claimer, error) {
+func NewResourceClaimer(log logr.Logger, plugins ...Plugin) (*claimer, error) {
 	c := claimer{
-		log:       log,
-		started:   started,
-		plugins:   map[string]Plugin{},
+		log:     log,
+		plugins: map[string]Plugin{},
+
 		toClaim:   make(chan claimReq, 1),
 		toRelease: make(chan releaseReq, 1),
+
+		started:  make(chan struct{}),
+		shutdown: make(chan struct{}),
 	}
 
 	for _, plugin := range plugins {
@@ -74,8 +78,9 @@ type claimer struct {
 	toClaim   chan claimReq
 	toRelease chan releaseReq
 
-	running atomic.Bool
-	started chan struct{}
+	startOnce sync.Once
+	started   chan struct{}
+	shutdown  chan struct{}
 }
 
 func (c *claimer) checkPluginsForResources(resources v1alpha1.ResourceList) error {
@@ -107,13 +112,14 @@ func (c *claimer) checkPluginsForClaims(claims Claims) error {
 }
 
 func (c *claimer) Start(ctx context.Context) error {
-	if !c.running.CompareAndSwap(false, true) {
-		return ErrAlreadyStarted
-	}
+	var called bool
+	c.startOnce.Do(func() {
+		called = true
+		go c.run(ctx)
+	})
 
-	go c.run(ctx)
-	if c.started != nil {
-		close(c.started)
+	if !called {
+		return ErrAlreadyStarted
 	}
 
 	<-ctx.Done()
@@ -123,21 +129,23 @@ func (c *claimer) Start(ctx context.Context) error {
 
 func (c *claimer) run(ctx context.Context) {
 	defer func() {
-		c.running.Store(false)
-		close(c.toClaim)
-		close(c.toRelease)
-
 		for req := range c.toClaim {
 			req.resultChan <- claimRes{err: ctx.Err()}
 		}
 		for req := range c.toRelease {
 			req.resultChan <- ctx.Err()
 		}
+
+		close(c.toClaim)
+		close(c.toRelease)
 	}()
+
+	close(c.started)
 
 	for {
 		select {
 		case <-ctx.Done():
+			close(c.shutdown)
 			return
 		case req := <-c.toClaim:
 			res := claimRes{}
@@ -152,6 +160,22 @@ func (c *claimer) run(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (c *claimer) ensureRunning() error {
+	select {
+	case <-c.started:
+	default:
+		return ErrNotStarted
+	}
+
+	select {
+	case <-c.shutdown:
+		return ErrNotStarted
+	default:
+	}
+
+	return nil
 }
 
 func (c *claimer) claim(resources v1alpha1.ResourceList) (Claims, error) {
@@ -192,8 +216,8 @@ func (c *claimer) Claim(ctx context.Context, resources v1alpha1.ResourceList) (C
 		return nil, errors.Join(ErrMissingPlugins, err)
 	}
 
-	if !c.running.Load() {
-		return nil, ErrNotStarted
+	if err := c.ensureRunning(); err != nil {
+		return nil, err
 	}
 
 	req := claimReq{
@@ -202,6 +226,8 @@ func (c *claimer) Claim(ctx context.Context, resources v1alpha1.ResourceList) (C
 	}
 	select {
 	case c.toClaim <- req:
+	case <-c.shutdown:
+		return nil, ErrNotStarted
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -235,16 +261,17 @@ func (c *claimer) Release(ctx context.Context, claims Claims) error {
 		return errors.Join(ErrMissingPlugins, err)
 	}
 
-	if !c.running.Load() {
-		return ErrNotStarted
+	if err := c.ensureRunning(); err != nil {
+		return err
 	}
-
 	req := releaseReq{
 		claims:     claims,
 		resultChan: make(chan error, 1),
 	}
 	select {
 	case c.toRelease <- req:
+	case <-c.shutdown:
+		return ErrNotStarted
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -254,5 +281,14 @@ func (c *claimer) Release(ctx context.Context, claims Claims) error {
 		return ctx.Err()
 	case res := <-req.resultChan:
 		return res
+	}
+}
+
+func (c *claimer) WaitUntilStarted(ctx context.Context) error {
+	select {
+	case <-c.started:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
