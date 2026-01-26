@@ -110,13 +110,25 @@ func (c *claimer) Start(ctx context.Context) error {
 	}
 
 	go c.run(ctx)
-
 	<-ctx.Done()
-	c.running.Store(false)
+
 	return nil
 }
 
 func (c *claimer) run(ctx context.Context) {
+	defer func() {
+		c.running.Store(false)
+		close(c.toClaim)
+		close(c.toRelease)
+
+		for req := range c.toClaim {
+			req.resultChan <- claimRes{err: ctx.Err()}
+		}
+		for req := range c.toRelease {
+			req.resultChan <- ctx.Err()
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():

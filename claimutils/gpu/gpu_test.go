@@ -32,7 +32,7 @@ var _ = Describe("GPU Claimer", func() {
 		plugin := gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", nil, nil)
 		Expect(plugin.Init()).Should(HaveOccurred())
 
-		By("init plugin without reader")
+		By("init plugin reader")
 		plugin = gpu.NewGPUClaimPlugin(log.FromContext(ctx), "test-plugin", &MockReader{}, nil)
 		Expect(plugin.Init()).ShouldNot(HaveOccurred())
 
