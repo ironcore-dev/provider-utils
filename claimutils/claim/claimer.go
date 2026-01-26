@@ -28,9 +28,10 @@ type Claimer interface {
 	Start(ctx context.Context) error
 }
 
-func NewResourceClaimer(log logr.Logger, plugins ...Plugin) (*claimer, error) {
+func NewResourceClaimer(log logr.Logger, started chan struct{}, plugins ...Plugin) (*claimer, error) {
 	c := claimer{
 		log:       log,
+		started:   started,
 		plugins:   map[string]Plugin{},
 		toClaim:   make(chan claimReq, 1),
 		toRelease: make(chan releaseReq, 1),
@@ -74,6 +75,7 @@ type claimer struct {
 	toRelease chan releaseReq
 
 	running atomic.Bool
+	started chan struct{}
 }
 
 func (c *claimer) checkPluginsForResources(resources v1alpha1.ResourceList) error {
@@ -110,6 +112,10 @@ func (c *claimer) Start(ctx context.Context) error {
 	}
 
 	go c.run(ctx)
+	if c.started != nil {
+		close(c.started)
+	}
+
 	<-ctx.Done()
 
 	return nil
