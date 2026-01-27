@@ -56,6 +56,18 @@ func NewResourceClaimer(log logr.Logger, plugins ...Plugin) (*claimer, error) {
 	return &c, nil
 }
 
+type claimer struct {
+	log     logr.Logger
+	plugins map[string]Plugin
+
+	toClaim   chan claimReq
+	toRelease chan releaseReq
+
+	startOnce sync.Once
+	started   chan struct{}
+	shutdown  chan struct{}
+}
+
 type claimRes struct {
 	claims Claims
 	err    error
@@ -71,63 +83,7 @@ type releaseReq struct {
 	resultChan chan error
 }
 
-type claimer struct {
-	log     logr.Logger
-	plugins map[string]Plugin
-
-	toClaim   chan claimReq
-	toRelease chan releaseReq
-
-	startOnce sync.Once
-	started   chan struct{}
-	shutdown  chan struct{}
-}
-
-func (c *claimer) checkPluginsForResources(resources v1alpha1.ResourceList) error {
-	var missingPluginErrors []error
-	for resourceName := range resources {
-		if _, ok := c.plugins[string(resourceName)]; !ok {
-			missingPluginErrors = append(missingPluginErrors, fmt.Errorf("plugin for resource %s not found", resourceName))
-		}
-	}
-	if len(missingPluginErrors) > 0 {
-		return errors.Join(missingPluginErrors...)
-	}
-
-	return nil
-}
-
-func (c *claimer) checkPluginsForClaims(claims Claims) error {
-	var missingPluginErrors []error
-	for resourceName := range claims {
-		if _, ok := c.plugins[string(resourceName)]; !ok {
-			missingPluginErrors = append(missingPluginErrors, fmt.Errorf("plugin for resource %s not found", resourceName))
-		}
-	}
-	if len(missingPluginErrors) > 0 {
-		return errors.Join(missingPluginErrors...)
-	}
-
-	return nil
-}
-
-func (c *claimer) Start(ctx context.Context) error {
-	var called bool
-	c.startOnce.Do(func() {
-		called = true
-		go c.run(ctx)
-	})
-
-	if !called {
-		return ErrAlreadyStarted
-	}
-
-	<-ctx.Done()
-
-	return nil
-}
-
-func (c *claimer) run(ctx context.Context) {
+func (c *claimer) start(ctx context.Context) {
 	defer func() {
 		for req := range c.toClaim {
 			req.resultChan <- claimRes{err: ctx.Err()}
@@ -160,6 +116,22 @@ func (c *claimer) run(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (c *claimer) Start(ctx context.Context) error {
+	var called bool
+	c.startOnce.Do(func() {
+		called = true
+		go c.start(ctx)
+	})
+
+	if !called {
+		return ErrAlreadyStarted
+	}
+
+	<-ctx.Done()
+
+	return nil
 }
 
 func (c *claimer) ensureRunning() error {
@@ -211,6 +183,20 @@ func (c *claimer) claim(resources v1alpha1.ResourceList) (Claims, error) {
 	return claims, nil
 }
 
+func (c *claimer) checkPluginsForResources(resources v1alpha1.ResourceList) error {
+	var missingPluginErrors []error
+	for resourceName := range resources {
+		if _, ok := c.plugins[string(resourceName)]; !ok {
+			missingPluginErrors = append(missingPluginErrors, fmt.Errorf("plugin for resource %s not found", resourceName))
+		}
+	}
+	if len(missingPluginErrors) > 0 {
+		return errors.Join(missingPluginErrors...)
+	}
+
+	return nil
+}
+
 func (c *claimer) Claim(ctx context.Context, resources v1alpha1.ResourceList) (Claims, error) {
 	if err := c.checkPluginsForResources(resources); err != nil {
 		return nil, errors.Join(ErrMissingPlugins, err)
@@ -251,6 +237,20 @@ func (c *claimer) release(claims Claims) error {
 	}
 	if len(releaseErrors) > 0 {
 		return errors.Join(releaseErrors...)
+	}
+
+	return nil
+}
+
+func (c *claimer) checkPluginsForClaims(claims Claims) error {
+	var missingPluginErrors []error
+	for resourceName := range claims {
+		if _, ok := c.plugins[string(resourceName)]; !ok {
+			missingPluginErrors = append(missingPluginErrors, fmt.Errorf("plugin for resource %s not found", resourceName))
+		}
+	}
+	if len(missingPluginErrors) > 0 {
+		return errors.Join(missingPluginErrors...)
 	}
 
 	return nil
