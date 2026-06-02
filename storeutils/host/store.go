@@ -17,6 +17,8 @@ import (
 	"github.com/ironcore-dev/provider-utils/storeutils/store"
 	utilssync "github.com/ironcore-dev/provider-utils/storeutils/sync"
 	"github.com/ironcore-dev/provider-utils/storeutils/utils"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -26,6 +28,7 @@ type Options[E api.Object] struct {
 	NewFunc         func() E
 	CreateStrategy  CreateStrategy[E]
 	WatchBufferSize int
+	FieldIndexers   map[string]store.IndexerFunc[E]
 }
 
 func (o *Options[E]) Defaults() {
@@ -45,6 +48,10 @@ func NewStore[E api.Object](opts Options[E]) (*Store[E], error) {
 		return nil, fmt.Errorf("error creating store directory: %w", err)
 	}
 
+	indexers := make(map[string]store.IndexerFunc[E], len(opts.FieldIndexers))
+	for k, v := range opts.FieldIndexers {
+		indexers[k] = v
+	}
 	return &Store[E]{
 		dir: opts.Dir,
 
@@ -55,6 +62,8 @@ func NewStore[E api.Object](opts Options[E]) (*Store[E], error) {
 
 		watches:         sets.New[*watch[E]](),
 		watchBufferSize: opts.WatchBufferSize,
+
+		indexers: indexers,
 	}, nil
 }
 
@@ -63,12 +72,13 @@ type Store[E api.Object] struct {
 
 	idMu *utilssync.MutexMap[string]
 
-	newFunc        func() E
-	createStrategy CreateStrategy[E]
-
+	newFunc         func() E
+	createStrategy  CreateStrategy[E]
 	watchBufferSize int
 	watchesMu       sync.RWMutex
 	watches         sets.Set[*watch[E]]
+
+	indexers map[string]store.IndexerFunc[E]
 }
 
 type CreateStrategy[E api.Object] interface {
@@ -192,7 +202,20 @@ func (s *Store[E]) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-func (s *Store[E]) List(ctx context.Context) ([]E, error) {
+func (s *Store[E]) List(ctx context.Context, opts ...store.ListOption) ([]E, error) {
+	listOpts := &store.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOpts)
+	}
+
+	if listOpts.FieldSelector != nil {
+		for _, req := range listOpts.FieldSelector.Requirements() {
+			if _, ok := s.indexers[req.Field]; !ok {
+				return nil, fmt.Errorf("field selector references unindexed field %q", req.Field)
+			}
+		}
+	}
+
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list objects: %w", err)
@@ -208,6 +231,22 @@ func (s *Store[E]) List(ctx context.Context) ([]E, error) {
 		object, err := s.Get(ctx, entry.Name())
 		if err != nil {
 			return nil, fmt.Errorf("failed to read object: %w", err)
+		}
+
+		if listOpts.LabelSelector != nil && !listOpts.LabelSelector.Matches(labels.Set(object.GetLabels())) {
+			continue
+		}
+
+		if listOpts.FieldSelector != nil {
+			merged := fields.Set{}
+			for _, req := range listOpts.FieldSelector.Requirements() {
+				if fn, ok := s.indexers[req.Field]; ok {
+					merged[req.Field] = fn(object)
+				}
+			}
+			if !listOpts.FieldSelector.Matches(merged) {
+				continue
+			}
 		}
 
 		objs = append(objs, object)
