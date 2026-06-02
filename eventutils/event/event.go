@@ -57,7 +57,7 @@ func setListWatchSourceOptionsDefaults(o *ListWatchSourceOptions) {
 	}
 }
 
-func NewListWatchSource[E api.Object](listFunc func(ctx context.Context) (
+func NewListWatchSource[E api.Object](listFunc func(ctx context.Context, opts ...store.ListOption) (
 	[]E, error),
 	watchFunc func(ctx context.Context) (store.Watch[E], error),
 	opts ListWatchSourceOptions,
@@ -73,7 +73,7 @@ func NewListWatchSource[E api.Object](listFunc func(ctx context.Context) (
 }
 
 type ListWatchSource[E api.Object] struct {
-	listFunc  func(ctx context.Context) ([]E, error)
+	listFunc  func(ctx context.Context, opts ...store.ListOption) ([]E, error)
 	watchFunc func(ctx context.Context) (store.Watch[E], error)
 
 	handlesMu sync.RWMutex
