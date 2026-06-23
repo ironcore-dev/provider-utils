@@ -17,6 +17,7 @@ import (
 	"github.com/ironcore-dev/provider-utils/storeutils/store"
 	utilssync "github.com/ironcore-dev/provider-utils/storeutils/sync"
 	"github.com/ironcore-dev/provider-utils/storeutils/utils"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -192,7 +193,12 @@ func (s *Store[E]) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-func (s *Store[E]) List(ctx context.Context) ([]E, error) {
+func (s *Store[E]) List(ctx context.Context, opts ...store.ListOption) ([]E, error) {
+	listOpts := &store.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOpts)
+	}
+
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list objects: %w", err)
@@ -208,6 +214,10 @@ func (s *Store[E]) List(ctx context.Context) ([]E, error) {
 		object, err := s.Get(ctx, entry.Name())
 		if err != nil {
 			return nil, fmt.Errorf("failed to read object: %w", err)
+		}
+
+		if listOpts.LabelSelector != nil && !listOpts.LabelSelector.Matches(labels.Set(object.GetLabels())) {
+			continue
 		}
 
 		objs = append(objs, object)
