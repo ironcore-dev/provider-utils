@@ -4,12 +4,14 @@
 package store
 
 import (
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
 type ListOptions struct {
 	LabelSelector labels.Selector
+	FieldSelector fields.Selector
 }
 
 type ListOption interface {
@@ -46,4 +48,15 @@ func andSelectors(existing, additional labels.Selector) labels.Selector {
 	}
 	reqs, _ := additional.Requirements()
 	return existing.Add(reqs...)
+}
+
+type MatchingFields fields.Set
+
+func (m MatchingFields) ApplyToList(o *ListOptions) {
+	sel := fields.Set(m).AsSelector()
+	if o.FieldSelector == nil {
+		o.FieldSelector = sel
+	} else {
+		o.FieldSelector = fields.AndSelectors(o.FieldSelector, sel)
+	}
 }
