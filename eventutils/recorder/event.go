@@ -14,9 +14,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// EventRecorder defines an interface for recording events
+// EventRecorder defines an interface for recording events.
+//
+// The action argument names the operation the reporter performed (e.g. "Destroy",
+// "AttachVolume", "Pull") and is distinct from reason, which names the outcome.
+// It must be non-empty: downstream consumers publish events into the
+// events.k8s.io/v1 API where action is a required field.
 type EventRecorder interface {
-	Eventf(apiMetadata api.Metadata, eventType string, reason string, messageFormat string, args ...any)
+	Eventf(apiMetadata api.Metadata, eventType, reason, action, messageFormat string, args ...any)
 }
 
 // EventStore defines an interface for listing events
@@ -28,6 +33,7 @@ type Event struct {
 	InvolvedObjectMeta api.Metadata
 	Type               string
 	Reason             string
+	Action             string
 	Message            string
 	EventTime          int64
 }
@@ -82,12 +88,12 @@ func NewEventStore(log logr.Logger, opts EventStoreOptions) *Store {
 }
 
 // Eventf logs and records an event with formatted message.
-func (es *Store) Eventf(apiMetadata api.Metadata, eventType, reason, messageFormat string, args ...any) {
-	es.recordEvent(apiMetadata, eventType, reason, fmt.Sprintf(messageFormat, args...))
+func (es *Store) Eventf(apiMetadata api.Metadata, eventType, reason, action, messageFormat string, args ...any) {
+	es.recordEvent(apiMetadata, eventType, reason, action, fmt.Sprintf(messageFormat, args...))
 }
 
 // recordEvent adds a new Event to the store. Implements the EventRecorder interface.
-func (es *Store) recordEvent(metadata api.Metadata, eventType, reason, message string) {
+func (es *Store) recordEvent(metadata api.Metadata, eventType, reason, action, message string) {
 	es.mutex.Lock()
 	defer es.mutex.Unlock()
 
@@ -106,6 +112,7 @@ func (es *Store) recordEvent(metadata api.Metadata, eventType, reason, message s
 		InvolvedObjectMeta: metadata,
 		Type:               eventType,
 		Reason:             reason,
+		Action:             action,
 		Message:            message,
 		EventTime:          time.Now().Unix(),
 	}
@@ -157,6 +164,7 @@ func (es *Store) ListEvents() []*Event {
 			InvolvedObjectMeta: event.InvolvedObjectMeta,
 			Type:               event.Type,
 			Reason:             event.Reason,
+			Action:             event.Action,
 			Message:            event.Message,
 			EventTime:          event.EventTime,
 		})

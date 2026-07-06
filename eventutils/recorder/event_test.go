@@ -28,6 +28,7 @@ const (
 	eventTTL       = 2 * time.Second
 	eventType      = "TestType"
 	reason         = "TestReason"
+	action         = "TestAction"
 	message        = "TestMessage"
 	resyncInterval = 2 * time.Second
 )
@@ -69,19 +70,24 @@ var _ = Describe("Machine EventStore", func() {
 
 	Context("AddEvent", func() {
 		It("should add an event to the store", func() {
-			es.Eventf(apiMetadata, eventType, reason, message)
+			es.Eventf(apiMetadata, eventType, reason, action, message)
 			Expect(logOutput.String()).To(BeEmpty())
-			Expect(es.ListEvents()).To(HaveLen(1))
+			events := es.ListEvents()
+			Expect(events).To(HaveLen(1))
+			Expect(events[0].Reason).To(Equal(reason))
+			Expect(events[0].Action).To(Equal(action))
+			Expect(events[0].Message).To(Equal(message))
+			Expect(events[0].Type).To(Equal(eventType))
 		})
 
 		It("should override the oldest event when the store is full", func() {
 			for i := 0; i < maxEvents; i++ {
-				es.Eventf(apiMetadata, eventType, reason, "%s %d", message, i)
+				es.Eventf(apiMetadata, eventType, reason, action, "%s %d", message, i)
 				Expect(logOutput.String()).To(BeEmpty())
 				Expect(es.ListEvents()).To(HaveLen(i + 1))
 			}
 
-			es.Eventf(apiMetadata, eventType, reason, "New Event")
+			es.Eventf(apiMetadata, eventType, reason, action, "New Event")
 			Expect(logOutput.String()).To(BeEmpty())
 
 			events := es.ListEvents()
@@ -97,7 +103,7 @@ var _ = Describe("Machine EventStore", func() {
 
 	Context("removeExpiredEvents", func() {
 		It("should remove events whose TTL has expired", func() {
-			es.Eventf(apiMetadata, eventType, reason, message)
+			es.Eventf(apiMetadata, eventType, reason, action, message)
 			Expect(logOutput.String()).To(BeEmpty())
 			Expect(es.ListEvents()).To(HaveLen(1))
 
@@ -112,7 +118,7 @@ var _ = Describe("Machine EventStore", func() {
 		})
 
 		It("should not remove events whose TTL has not expired", func() {
-			es.Eventf(apiMetadata, eventType, reason, message)
+			es.Eventf(apiMetadata, eventType, reason, action, message)
 			Expect(logOutput.String()).To(BeEmpty())
 			Expect(es.ListEvents()).To(HaveLen(1))
 
@@ -132,7 +138,7 @@ var _ = Describe("Machine EventStore", func() {
 
 			go es.Start(ctx)
 
-			es.Eventf(apiMetadata, eventType, reason, message)
+			es.Eventf(apiMetadata, eventType, reason, action, message)
 			Expect(logOutput.String()).To(BeEmpty())
 			Expect(es.ListEvents()).To(HaveLen(1))
 
@@ -144,7 +150,7 @@ var _ = Describe("Machine EventStore", func() {
 
 	Context("ListEvents", func() {
 		It("should return all current events", func() {
-			es.Eventf(apiMetadata, eventType, reason, message)
+			es.Eventf(apiMetadata, eventType, reason, action, message)
 			Expect(logOutput.String()).To(BeEmpty())
 
 			events := es.ListEvents()
@@ -153,7 +159,7 @@ var _ = Describe("Machine EventStore", func() {
 		})
 
 		It("should return a copy of events", func() {
-			es.Eventf(apiMetadata, eventType, reason, message)
+			es.Eventf(apiMetadata, eventType, reason, action, message)
 			Expect(logOutput.String()).To(BeEmpty())
 			events := es.ListEvents()
 			Expect(events).To(HaveLen(1))
