@@ -11,7 +11,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
 	github.com/opencontainers/image-spec v1.1.1
-	github.com/prometheus/procfs v0.21.0
+	github.com/prometheus/procfs v0.21.1
 	go.uber.org/zap v1.28.0
 	k8s.io/apimachinery v0.33.4
 	sigs.k8s.io/controller-runtime v0.21.0
