@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/containerd/containerd v1.7.34
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/ironcore-dev/controller-utils v0.10.0
 	github.com/ironcore-dev/ironcore v0.2.4
 	github.com/ironcore-dev/ironcore-image v0.5.0
