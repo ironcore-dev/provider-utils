@@ -203,18 +203,44 @@ func (s *Store[E]) Delete(_ context.Context, id string) error {
 	return nil
 }
 
+func (s *Store[E]) validateFieldSelector(opts store.ListOptions) error {
+	if opts.FieldSelector == nil {
+		return nil
+	}
+	for _, req := range opts.FieldSelector.Requirements() {
+		if _, ok := s.indexers[req.Field]; !ok {
+			return fmt.Errorf("field selector references unindexed field %q", req.Field)
+		}
+	}
+	return nil
+}
+
+func (s *Store[E]) matchesOptions(obj E, opts store.ListOptions) bool {
+	if opts.LabelSelector != nil && !opts.LabelSelector.Matches(labels.Set(obj.GetLabels())) {
+		return false
+	}
+	if opts.FieldSelector != nil {
+		merged := fields.Set{}
+		for _, req := range opts.FieldSelector.Requirements() {
+			if fn, ok := s.indexers[req.Field]; ok {
+				merged[req.Field] = fn(obj)
+			}
+		}
+		if !opts.FieldSelector.Matches(merged) {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Store[E]) List(ctx context.Context, opts ...store.ListOption) ([]E, error) {
 	listOpts := &store.ListOptions{}
 	for _, opt := range opts {
 		opt.ApplyToList(listOpts)
 	}
 
-	if listOpts.FieldSelector != nil {
-		for _, req := range listOpts.FieldSelector.Requirements() {
-			if _, ok := s.indexers[req.Field]; !ok {
-				return nil, fmt.Errorf("field selector references unindexed field %q", req.Field)
-			}
-		}
+	if err := s.validateFieldSelector(*listOpts); err != nil {
+		return nil, err
 	}
 
 	entries, err := os.ReadDir(s.dir)
@@ -234,20 +260,8 @@ func (s *Store[E]) List(ctx context.Context, opts ...store.ListOption) ([]E, err
 			return nil, fmt.Errorf("failed to read object: %w", err)
 		}
 
-		if listOpts.LabelSelector != nil && !listOpts.LabelSelector.Matches(labels.Set(object.GetLabels())) {
+		if !s.matchesOptions(object, *listOpts) {
 			continue
-		}
-
-		if listOpts.FieldSelector != nil {
-			merged := fields.Set{}
-			for _, req := range listOpts.FieldSelector.Requirements() {
-				if fn, ok := s.indexers[req.Field]; ok {
-					merged[req.Field] = fn(object)
-				}
-			}
-			if !listOpts.FieldSelector.Matches(merged) {
-				continue
-			}
 		}
 
 		objs = append(objs, object)
@@ -256,13 +270,24 @@ func (s *Store[E]) List(ctx context.Context, opts ...store.ListOption) ([]E, err
 	return objs, nil
 }
 
-func (s *Store[E]) Watch(_ context.Context) (store.Watch[E], error) {
+func (s *Store[E]) Watch(_ context.Context, opts ...store.ListOption) (store.Watch[E], error) {
+	listOpts := &store.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOpts)
+	}
+
+	if err := s.validateFieldSelector(*listOpts); err != nil {
+		return nil, err
+	}
+
 	s.watchesMu.Lock()
 	defer s.watchesMu.Unlock()
 
 	w := &watch[E]{
-		store:  s,
-		events: make(chan store.WatchEvent[E], s.watchBufferSize),
+		store:   s,
+		events:  make(chan store.WatchEvent[E], s.watchBufferSize),
+		opts:    *listOpts,
+		members: sets.New[string](),
 	}
 
 	s.watches.Insert(w)
@@ -321,11 +346,23 @@ func (s *Store[E]) watchHandlers() []*watch[E] {
 	return s.watches.UnsortedList()
 }
 
+func (s *Store[E]) send(w *watch[E], evt store.WatchEvent[E]) {
+	select {
+	case w.events <- evt:
+	default:
+	}
+}
+
 func (s *Store[E]) enqueue(evt store.WatchEvent[E]) {
+	id := evt.Object.GetID()
 	for _, handler := range s.watchHandlers() {
-		select {
-		case handler.events <- evt:
-		default:
+		if handler.matches(evt.Object) {
+			handler.members.Insert(id)
+			s.send(handler, evt)
+		} else if handler.members.Has(id) {
+			// Object transitioned out of this watch's scope. Send deleted event.
+			handler.members.Delete(id)
+			s.send(handler, store.WatchEvent[E]{Type: store.WatchEventTypeDeleted, Object: evt.Object})
 		}
 	}
 }

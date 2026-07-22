@@ -58,7 +58,7 @@ func setListWatchSourceOptionsDefaults(o *ListWatchSourceOptions) {
 }
 
 type ListFunc[E api.Object] func(context.Context, ...store.ListOption) ([]E, error)
-type WatchFunc[E api.Object] func(context.Context) (store.Watch[E], error)
+type WatchFunc[E api.Object] func(context.Context, ...store.ListOption) (store.Watch[E], error)
 
 func NewListWatchSource[E api.Object](listFunc ListFunc[E],
 	watchFunc WatchFunc[E],

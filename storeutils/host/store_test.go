@@ -136,4 +136,79 @@ var _ = Describe("Store", func() {
 		Expect(filtered).To(HaveLen(1))
 		Expect(filtered[0].GetID()).To(Equal("combined-a"))
 	})
+
+	Describe("Watch", func() {
+		It("should receive events without a filter", func(ctx SpecContext) {
+			watch, err := dummyStore.Watch(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(watch.Stop)
+
+			obj := createDummy(ctx, dummyStore, "watch-no-filter", nil, "")
+			event := store.WatchEvent[*Dummy]{Type: store.WatchEventTypeCreated, Object: obj}
+			Eventually(watch.Events()).Should(Receive(Equal(event)))
+		})
+
+		It("should only receive events for objects matching a label selector", func(ctx SpecContext) {
+			watch, err := dummyStore.Watch(ctx, store.MatchingLabels{"app": "watched"})
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(watch.Stop)
+
+			By("creating a non-matching object")
+			createDummy(ctx, dummyStore, "watch-label-ignored", map[string]string{"app": "other"}, "")
+
+			By("checking that the non-matching event is not received")
+			Consistently(watch.Events()).ShouldNot(Receive())
+
+			By("creating a matching object")
+			obj := createDummy(ctx, dummyStore, "watch-label-matched", map[string]string{"app": "watched"}, "")
+
+			event := store.WatchEvent[*Dummy]{Type: store.WatchEventTypeCreated, Object: obj}
+			Eventually(watch.Events()).Should(Receive(Equal(event)))
+		})
+
+		It("should only receive events for objects matching a field selector", func(ctx SpecContext) {
+			watch, err := dummyStoreField.Watch(ctx, store.MatchingFields{"spec": "ssd"})
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(watch.Stop)
+
+			By("creating a non-matching object")
+			createDummy(ctx, dummyStoreField, "watch-field-ignored", nil, "hdd")
+
+			By("checking that the non-matching event is not received")
+			Consistently(watch.Events()).ShouldNot(Receive())
+
+			By("creating a matching object")
+			obj := createDummy(ctx, dummyStoreField, "watch-field-matched", nil, "ssd")
+
+			event := store.WatchEvent[*Dummy]{Type: store.WatchEventTypeCreated, Object: obj}
+			Eventually(watch.Events()).Should(Receive(Equal(event)))
+		})
+
+		It("should only receive events matching combined label and field selectors", func(ctx SpecContext) {
+			watch, err := dummyStoreField.Watch(ctx,
+				store.MatchingLabels{"env": "prod"},
+				store.MatchingFields{"spec": "ssd"},
+			)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(watch.Stop)
+
+			By("creating objects that only partially match")
+			createDummy(ctx, dummyStoreField, "watch-combined-label-only", map[string]string{"env": "prod"}, "hdd")
+			createDummy(ctx, dummyStoreField, "watch-combined-field-only", map[string]string{"env": "dev"}, "ssd")
+
+			Consistently(watch.Events()).ShouldNot(Receive())
+
+			By("creating the object that matches both selectors")
+			obj := createDummy(ctx, dummyStoreField, "watch-combined-matched", map[string]string{"env": "prod"}, "ssd")
+
+			event := store.WatchEvent[*Dummy]{Type: store.WatchEventTypeCreated, Object: obj}
+			Eventually(watch.Events()).Should(Receive(Equal(event)))
+		})
+
+		It("should return an error when Watch references an unindexed field", func(ctx SpecContext) {
+			_, err := dummyStoreField.Watch(ctx, store.MatchingFields{"nonexistent": "value"})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unindexed field"))
+		})
+	})
 })

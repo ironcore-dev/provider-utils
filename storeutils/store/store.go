@@ -51,5 +51,5 @@ type Store[E api.Object] interface {
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, opts ...ListOption) ([]E, error)
 
-	Watch(ctx context.Context) (Watch[E], error)
+	Watch(ctx context.Context, opts ...ListOption) (Watch[E], error)
 }
