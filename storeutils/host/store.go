@@ -270,7 +270,7 @@ func (s *Store[E]) List(ctx context.Context, opts ...store.ListOption) ([]E, err
 	return objs, nil
 }
 
-func (s *Store[E]) Watch(_ context.Context, opts ...store.ListOption) (store.Watch[E], error) {
+func (s *Store[E]) Watch(ctx context.Context, opts ...store.ListOption) (store.Watch[E], error) {
 	listOpts := &store.ListOptions{}
 	for _, opt := range opts {
 		opt.ApplyToList(listOpts)
@@ -280,6 +280,20 @@ func (s *Store[E]) Watch(_ context.Context, opts ...store.ListOption) (store.Wat
 		return nil, err
 	}
 
+	// List runs before acquiring watchesMu to avoid a deadlock: List→Get acquires
+	// idMu, while mutations hold idMu before calling enqueue→watchesMu.RLock.
+	// This means a mutation between List and watches.Insert may be missed in
+	// members, but we accept that narrow gap.
+	existing, err := s.List(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list existing objects for watch: %w", err)
+	}
+
+	members := sets.New[string]()
+	for _, obj := range existing {
+		members.Insert(obj.GetID())
+	}
+
 	s.watchesMu.Lock()
 	defer s.watchesMu.Unlock()
 
@@ -287,7 +301,7 @@ func (s *Store[E]) Watch(_ context.Context, opts ...store.ListOption) (store.Wat
 		store:   s,
 		events:  make(chan store.WatchEvent[E], s.watchBufferSize),
 		opts:    *listOpts,
-		members: sets.New[string](),
+		members: members,
 	}
 
 	s.watches.Insert(w)
