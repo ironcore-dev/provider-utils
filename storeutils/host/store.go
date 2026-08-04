@@ -346,23 +346,27 @@ func (s *Store[E]) watchHandlers() []*watch[E] {
 	return s.watches.UnsortedList()
 }
 
-func (s *Store[E]) send(w *watch[E], evt store.WatchEvent[E]) {
-	select {
-	case w.events <- evt:
-	default:
-	}
-}
-
 func (s *Store[E]) enqueue(evt store.WatchEvent[E]) {
 	id := evt.Object.GetID()
 	for _, handler := range s.watchHandlers() {
+		var toSend *store.WatchEvent[E]
+
+		handler.membersMu.Lock()
 		if handler.matches(evt.Object) {
 			handler.members.Insert(id)
-			s.send(handler, evt)
+			toSend = &evt
 		} else if handler.members.Has(id) {
 			// Object transitioned out of this watch's scope. Send deleted event.
 			handler.members.Delete(id)
-			s.send(handler, store.WatchEvent[E]{Type: store.WatchEventTypeDeleted, Object: evt.Object})
+			toSend = &store.WatchEvent[E]{Type: store.WatchEventTypeDeleted, Object: evt.Object}
+		}
+		handler.membersMu.Unlock()
+
+		if toSend != nil {
+			select {
+			case handler.events <- *toSend:
+			default:
+			}
 		}
 	}
 }
