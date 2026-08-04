@@ -363,22 +363,29 @@ func (s *Store[E]) watchHandlers() []*watch[E] {
 func (s *Store[E]) enqueue(evt store.WatchEvent[E]) {
 	id := evt.Object.GetID()
 	for _, handler := range s.watchHandlers() {
-		var toSend *store.WatchEvent[E]
+		var toSend store.WatchEvent[E]
 
 		handler.membersMu.Lock()
-		if handler.matches(evt.Object) {
+		if evt.Type == store.WatchEventTypeDeleted {
+			// Object was deleted; forward only if we were tracking it.
+			if handler.members.Has(id) {
+				handler.members.Delete(id)
+				toSend = evt
+			}
+		} else if handler.matches(evt.Object) {
+			// Object matches the filter; track it and forward the event.
 			handler.members.Insert(id)
-			toSend = &evt
+			toSend = evt
 		} else if handler.members.Has(id) {
-			// Object transitioned out of this watch's scope. Send deleted event.
+			// Object no longer matches the filter. Send deleted event.
 			handler.members.Delete(id)
-			toSend = &store.WatchEvent[E]{Type: store.WatchEventTypeDeleted, Object: evt.Object}
+			toSend = store.WatchEvent[E]{Type: store.WatchEventTypeDeleted, Object: evt.Object}
 		}
 		handler.membersMu.Unlock()
 
-		if toSend != nil {
+		if toSend.Type != "" {
 			select {
-			case handler.events <- *toSend:
+			case handler.events <- toSend:
 			default:
 			}
 		}
