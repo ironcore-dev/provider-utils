@@ -366,17 +366,18 @@ func (s *Store[E]) enqueue(evt store.WatchEvent[E]) {
 		var toSend store.WatchEvent[E]
 
 		handler.membersMu.Lock()
-		if evt.Type == store.WatchEventTypeDeleted {
+		switch {
+		case evt.Type == store.WatchEventTypeDeleted:
 			// Object was deleted; forward only if we were tracking it.
 			if handler.members.Has(id) {
 				handler.members.Delete(id)
 				toSend = evt
 			}
-		} else if handler.matches(evt.Object) {
+		case handler.matches(evt.Object):
 			// Object matches the filter; track it and forward the event.
 			handler.members.Insert(id)
 			toSend = evt
-		} else if handler.members.Has(id) {
+		case handler.members.Has(id):
 			// Object no longer matches the filter. Send deleted event.
 			handler.members.Delete(id)
 			toSend = store.WatchEvent[E]{Type: store.WatchEventTypeDeleted, Object: evt.Object}
