@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/provider-utils/apiutils/api"
 	"github.com/ironcore-dev/provider-utils/storeutils/store"
 	utilssync "github.com/ironcore-dev/provider-utils/storeutils/sync"
@@ -29,6 +30,7 @@ type Options[E api.Object] struct {
 	CreateStrategy  CreateStrategy[E]
 	WatchBufferSize int
 	FieldIndexers   map[string]store.IndexerFunc[E]
+	Log             logr.Logger
 }
 
 func (o *Options[E]) Defaults() {
@@ -54,6 +56,7 @@ func NewStore[E api.Object](opts Options[E]) (*Store[E], error) {
 	}
 	return &Store[E]{
 		dir: opts.Dir,
+		log: opts.Log,
 
 		idMu: utilssync.NewMutexMap[string](),
 
@@ -69,6 +72,7 @@ func NewStore[E api.Object](opts Options[E]) (*Store[E], error) {
 
 type Store[E api.Object] struct {
 	dir string
+	log logr.Logger
 
 	idMu *utilssync.MutexMap[string]
 
@@ -388,6 +392,8 @@ func (s *Store[E]) enqueue(evt store.WatchEvent[E]) {
 			select {
 			case handler.events <- toSend:
 			default:
+				// TODO: switch to `ctx` to backpressure, if channel size is not enough
+				s.log.Info("Dropping watch event, due to full channel", "event", evt)
 			}
 		}
 	}
