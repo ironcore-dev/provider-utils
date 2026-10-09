@@ -3,7 +3,7 @@ module github.com/ironcore-dev/provider-utils
 go 1.26.0
 
 require (
-	github.com/containerd/containerd v1.7.35
+	github.com/containerd/containerd v1.7.36
 	github.com/go-logr/logr v1.4.4
 	github.com/ironcore-dev/controller-utils v0.14.0
 	github.com/ironcore-dev/ironcore v0.7.0
