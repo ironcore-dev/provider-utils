@@ -8,7 +8,7 @@ type NetworkInterfaceState string
 
 const (
 	NetworkInterfaceStatePending  NetworkInterfaceState = "Pending"
-	NetworkInterfaceStatePrepared NetworkInterfaceState = "Ready"
+	NetworkInterfaceStateReady    NetworkInterfaceState = "Ready"
 	NetworkInterfaceStateAttached NetworkInterfaceState = "Attached"
 	NetworkInterfaceStateError    NetworkInterfaceState = "Error"
 )
