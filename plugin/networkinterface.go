@@ -51,10 +51,9 @@ type NetworkInterfaceStatus struct {
 // PCI address on the host to be passed through to the guest as a network
 // interface.
 type PCI struct {
-	Domain   uint
-	Bus      uint
-	Slot     uint
-	Function uint
+	// BDF is the (Domain) / Bus / Device / Function address of the PCI
+	// function in the format `(domain:)bus:device:function`.
+	BDF string
 }
 
 // TAP device of which the hypervisor should take control of the fd-end to
