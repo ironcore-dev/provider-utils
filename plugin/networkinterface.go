@@ -10,10 +10,9 @@ import (
 type NetworkInterfaceState string
 
 const (
-	NetworkInterfaceStatePending  NetworkInterfaceState = "Pending"
-	NetworkInterfaceStateReady    NetworkInterfaceState = "Ready"
-	NetworkInterfaceStateAttached NetworkInterfaceState = "Attached"
-	NetworkInterfaceStateError    NetworkInterfaceState = "Error"
+	NetworkInterfaceStatePending NetworkInterfaceState = "Pending"
+	NetworkInterfaceStateReady   NetworkInterfaceState = "Ready"
+	NetworkInterfaceStateError   NetworkInterfaceState = "Error"
 )
 
 // NetworkInterface plugin definition to be implemented by the plugin and called
