@@ -39,7 +39,6 @@ type NetworkInterfaceSpec struct {
 }
 
 type NetworkInterfaceStatus struct {
-	Name   string                `json:"name"`
 	Handle string                `json:"handle"`
 	State  NetworkInterfaceState `json:"state"`
 
