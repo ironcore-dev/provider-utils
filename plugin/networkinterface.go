@@ -5,6 +5,7 @@ package plugin
 
 import (
 	"context"
+	"net/netip"
 )
 
 type NetworkInterfaceState string
@@ -38,9 +39,17 @@ type NetworkInterfaceSpec struct {
 	Ips       []string                  `json:"ips"`
 }
 
+// NetworkInterfaceStatus is returned by a plugin after successfully applying a
+// network interface. It contains the effective configuration of the interface
+// and the device type that the hypervisor can consume. A plugin must exactly
+// one non-nil device type.
 type NetworkInterfaceStatus struct {
 	Handle string                `json:"handle"`
 	State  NetworkInterfaceState `json:"state"`
+
+	Prefixes  netip.Prefix `json:"prefixes"`
+	Ips       []netip.Addr `json:"ips"`
+	VirtualIp netip.Addr   `json:"virtual-ip"`
 
 	PCI    *PCI
 	TAP    *TAP
