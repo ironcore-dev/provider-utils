@@ -36,6 +36,7 @@ type NetworkInterfaceSpec struct {
 	Metadata  *NetworkInterfaceMetadata `json:"metadata"`
 	Name      string                    `json:"name"`
 	NetworkId string                    `json:"networkId"`
+	Hostname  string                    `json:"hostname"`
 	Ips       []string                  `json:"ips"`
 }
 
