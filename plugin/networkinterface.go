@@ -48,9 +48,9 @@ type NetworkInterfaceStatus struct {
 	Handle string                `json:"handle"`
 	State  NetworkInterfaceState `json:"state"`
 
-	Prefixes  netip.Prefix `json:"prefixes"`
-	Ips       []netip.Addr `json:"ips"`
-	VirtualIp netip.Addr   `json:"virtual-ip"`
+	Prefixes  []netip.Prefix `json:"prefixes"`
+	Ips       []netip.Addr   `json:"ips"`
+	VirtualIp netip.Addr     `json:"virtual-ip"`
 
 	PCI    *PCI
 	TAP    *TAP
