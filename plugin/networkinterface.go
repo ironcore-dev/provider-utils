@@ -61,7 +61,7 @@ type NetworkInterfaceStatus struct {
 // interface.
 type PCI struct {
 	// BDF is the (Domain) / Bus / Device / Function address of the PCI
-	// function in the format `(domain:)bus:device:function`.
+	// function in the format `(domain:)bus:device.function`.
 	BDF string
 }
 
