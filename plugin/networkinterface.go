@@ -23,7 +23,7 @@ type NetworkInterface interface {
 	Name() string
 
 	Apply(ctx context.Context, spec *NetworkInterfaceSpec, machineID string) (*NetworkInterfaceStatus, error)
-	Delete(ctx context.Context, computeNicName string, machineID string) error
+	Delete(ctx context.Context, spec *NetworkInterfaceSpec, machineID string) error
 }
 
 type NetworkInterfaceMetadata struct {
