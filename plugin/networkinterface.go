@@ -16,6 +16,14 @@ const (
 	NetworkInterfaceStateError   NetworkInterfaceState = "Error"
 )
 
+// NetworkInterfacePluginStarter is implemented by network interface plugins
+// that need a background process, e.g. to watch for changes. Start is run once
+// the machine reconciler exists and blocks until ctx is done. Reconciles of
+// machines are requested via networkinterfaceplugin.Deps.EnqueueMachine.
+type NetworkInterfaceStarter interface {
+	Start(ctx context.Context) error
+}
+
 // NetworkInterface plugin definition to be implemented by the plugin and called
 // from the provider. If the plugin requires initial setup it should offer a
 // corresponding function for the provider to call.
